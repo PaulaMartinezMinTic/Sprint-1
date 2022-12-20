@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">My Application</string>
+
+    //MainActivity Strings
+    <string name="text_product1">Comida</string>
+    <string name="text_product2">Accesorios</string>
+    <string name="text_product3">Recuerdos</string>
+    <string name="text_title">Productos para Gatos</string>
+    <string name="text_btn_product">INFO</string>
+
+    //MainActivity2 Strings
+    <string name="text_btn_return">Volver</string>
+
+    //MainActivity3 Strings
+    <string name="text_btn_home">Home</string>
+</resources>
