@@ -1,0 +1,754 @@
+"""
+Created on Wed Mar 15 12:00:55 2023
+
+@author: paulamartinez
+"""
+
+import numpy as np
+from scipy.integrate import odeint
+from scipy.optimize import curve_fit
+from sklearn.metrics import r2_score
+import matplotlib.pyplot as plt
+
+# Leer los datos de concentración 
+# la concentración está en la segunda columna
+# Aminoacidos t=0
+Glu_exp = [ 2.92745, 1.19172, 0.106576, 0.0662402, 0.051049, 0.0596319, 0.0700526]  
+t_exp = [0, 21, 42, 65, 71, 94, 115]
+Glu_exp = np.array(Glu_exp)
+t_exp = np.array(t_exp)
+
+Asp_exp = [1.60445, 0.386797, 0, 0, 0, 0, 0] 
+Asp_exp = np.array(Asp_exp)
+
+Ser_exp = [1.07081, 0.0634568, 0, 0, 0, 0, 0]  
+Ser_exp = np.array(Ser_exp)
+
+Trp_exp = [0.00335888, 0.00212607, 0.000893261, 0.000838001, 0.00105147, 0.0012375, 0.00107596]  
+
+Phe_exp = [0.469488, 0.422222, 0.0154901, 0.00264655, 0, 0, 0]  
+
+Ala_exp = [0.863843, 0.649296, 0.184318, 0.0765609, 0.0102118, 0.0110051, 0.0775023] 
+
+His_exp = [0.177033, 0.176176, 0.00787757, 0.00636672, 0.00973305, 0.0135537, 0.0316491]   
+
+# Aminoacidos t>20
+Pro_exp = [1.57615, 0.166084, 0.0617377, 0.0351564, 0.0365374, 0.0454198, 0.0454198]
+tspan2_exp = [21, 42, 65, 72, 94, 115, 116]
+
+Thr_exp = [0.732695248, 0.243816636, 0.039055643, 0.016172643, 0.014969444, 0.012537902, 0.012537902]  
+
+Lys_exp = [1.039701415, 1.077342666, 0.792719496, 0.619401714, 0.179107916, 0.011702003, 0.011702003] 
+
+Cys_exp = [0.736079443, 0.099171582, 0.029603249, 0.00530209, 0, 0, 0]  
+
+Arg_exp = [0.454047906, 0.413610356, 0.264011532, 0.197854481, 0.008503571, 0.002203449, 0.002203449]  
+
+Leu_exp = [1.396992121, 0.105555358, 0.01633375, 0, 0, 0, 0]  
+
+Tyr_exp = [0.328051889, 0.002741451, 0, 0, 0, 0, 0]  
+
+Gly_exp = [0.623685536, 0.054807691, 0, 0, 0, 0, 0]  
+
+Val_exp = [0.328051889, 0.002741451, 0, 0, 0, 0, 0]  
+
+#Biomasa
+X_exp = [0.5 , 3, 15, 16, 15, 10, 5]   
+X_exp = np.array(X_exp)
+
+t2_exp = [21, 42, 65, 72, 94, 115, 116]
+#Sustrato
+S_exp = [217.1788468, 146.2014024, 68.79352297, 40.09922283, 6.127112716, 1.189023854, 1.219356095]  
+S_exp = np.array(S_exp)
+
+NH4_exp = [135.0557839, 91.27908154, 72.65069755, 55.74341426, 42.78453844 ,19.70154089 ,8.666248203]  
+NH4_exp = np.array(NH4_exp)
+
+PO4_exp = [26.32410235, 12.91508323, 11.79511233, 11.4792231, 9.555170532, 8.731944059, 8.033158797]  
+PO4_exp = np.array(PO4_exp)
+
+#Producto
+P_exp = [0, 0.002510544, 0.045189797, 0.175616632, 0.18515572, 0.168014241, 0.116612456] 
+P_exp = [x*1000 for x in P_exp]
+P_exp = np.array(P_exp)
+# Valores iniciales para resolver el sistema de ecuaciones
+
+# Concentración inicial del sustrato (g/L)
+Glyc0 = 217.1788468 #Glyc
+Nn40= 135.0557839 
+Po40= 26.32410235 
+# Concentración inicial del producto (g/L)
+Ac0 = 0 
+# Concentración inicial de biomasa (g/L)
+Xb0 = 0.5
+
+# Concentración inicial del aminoácido (g/L)
+#Aminoacido t=20
+Glu0 = 2.927448489 
+Asp0 = 1.604446738 
+Ser0 = 1.070808102 
+Trp0 = 0.003358885 
+Phe0 = 0.46948772 
+Ala0 = 0.86384313 
+His0 = 0.177033173 
+
+#Aminoacido t>20
+Pro0 = 1.576153139 
+Thr0 = 0.732695248 
+Lys0 = 1.039701415 
+Cys0 = 0.736079443 
+Arg0 = 0.454047906 
+Leu0 = 1.396992121 
+Tyr0 = 0.328051889 
+Gly0 = 0.623685536 
+Val0 = 0.32913581 
+C2 = 1.18902385
+
+    
+# Ecuación cinética
+def kinetics( t, x, 
+             mu_max_glyc, mu_max_glu, mu_max_asp, 
+             mu_max_ser, mu_max_trp, mu_max_phe, 
+             mu_max_ala, mu_max_his, mu_max_pro, 
+             mu_max_thr, mu_max_lys, mu_max_cys, 
+             mu_max_arg, mu_max_leu, mu_max_tyr,  
+             mu_max_gly, mu_max_val, 
+             Ks_glyc, Ks_glu, Ks_asp, 
+             Ks_ser, Ks_trp, Ks_phe, 
+             Ks_ala, Ks_his, Ks_pro, 
+             Ks_thr, Ks_lys, Ks_cys, 
+             Ks_arg, Ks_leu, Ks_tyr,
+             Ks_gly, Ks_val,
+             Kp, Kd, alfa,
+             Yxglyc, Yxp, 
+             Yxnh, Yxpo4):   
+     
+    Glyc , Nh4, Po4, Xb, Ac, Glu, Asp, Ser, Trp, Phe, Ala, His, Pro, Thr, Lys, Cys, Arg, Leu, Tyr, Gly, Val = x
+	    
+    #Aminoacidos t=0
+    #t=0
+
+    mu_Glu = mu_max_glu * Glu**2 / (Ks_glu + Glu) 
+
+    mu_Asp = mu_max_asp * Asp**2 / (Ks_asp + Asp )
+
+    mu_Ser = mu_max_ser * Ser**2 / (Ks_ser + Ser ) 
+    
+    mu_Trp = mu_max_trp * Trp**2 / (Ks_trp + Trp )
+
+    mu_Phe =  mu_max_phe * Phe**2 / (Ks_phe + Phe ) 
+
+    mu_Ala =  mu_max_ala * Ala**2 / (Ks_ala + Ala )
+    
+    mu_His = mu_max_his * His**2 / (Ks_his + His) 
+
+    #t>20
+    mu_Pro = mu_max_pro * Pro**2/ (Ks_pro + Pro )
+ 
+    mu_Thr = mu_max_thr * Thr**2/ (Ks_thr + Thr ) 
+
+    mu_Lys = mu_max_lys * Lys**2/ (Ks_lys +Lys ) 
+ 
+    mu_Cys = mu_max_cys * Cys**2/ (Ks_cys + Cys )  
+
+    mu_Arg = mu_max_arg * Arg**2/ (Ks_arg + Arg )
+ 
+    mu_Leu = mu_max_leu * Leu**2/ (Ks_leu +  Leu )
+
+    mu_Tyr = mu_max_tyr * Tyr**2/ (Ks_tyr + Tyr ) 
+ 
+    mu_Gly = mu_max_gly * Gly**2/ (Ks_gly + Gly)
+ 
+    mu_Val =  mu_max_val * Val**2/ (Ks_val + Val ) 
+    
+    if t <= 21:
+        Wn = 0
+    else:
+        Wn = 1
+    
+    if t <= 65:
+        fc1 = 0
+    else:
+        fc1 = 1
+        
+    if t <= 78:
+        W = 0
+    else:
+        W = 1
+        
+    if t <= 18:
+        Wv = 0
+    else:
+        Wv = 1 
+     
+     #Aminoacidos t=0
+    dGludt = -((mu_Glu)) * Xb
+    dAspdt = -((mu_Asp)) * Xb
+    dSerdt = -((mu_Ser)) * Xb
+    dTrpdt = -((mu_Trp)) * Xb
+    dPhedt = -((mu_Phe)) * Xb
+    dAladt = -((mu_Ala)) * Xb
+    dHisdt = -((mu_His)) * Xb
+
+    dProdt = -((mu_Pro)) * Xb  * Wn
+    dThrdt = -(( mu_Thr))* Xb  * Wn
+    dLysdt = -((mu_Lys)) * Xb  * Wn
+    dCysdt = -((mu_Cys)) * Xb  * Wn
+    dArgdt = -((mu_Arg)) * Xb  * Wn
+    dLeudt = -((mu_Leu)) * Xb  * Wn
+    dTyrdt = -((mu_Tyr)) * Xb  * Wn
+    dGlydt = -((mu_Gly)) * Xb  * Wn
+    dValdt = -((mu_Val)) * Xb  * Wn
+   
+    
+# Ecuaciones cinéticas del Sustrato, Producto y Biommasa
+    mu_glyc = (mu_max_glyc * (Glyc /( Ks_glyc * Xb + Glyc)))
+    mu_1= mu_Glu + mu_Asp + mu_Ser + mu_Trp + mu_Phe + mu_Ala + mu_His + mu_glyc
+    mu_2= mu_Pro + mu_Thr + mu_Lys + mu_Cys + mu_Arg + mu_Leu + mu_Tyr + mu_Gly + mu_Val
+    mu = mu_1 + mu_2  
+
+    # Sustrato
+    dGlycdt = - mu_glyc * Xb * (1 / Yxglyc)
+    dNh4dt = - mu_glyc * Xb * (1 / Yxnh)
+    dPo4dt = - mu_glyc * Xb * (1 / Yxpo4)
+
+    # Producto
+    dAcdt = (((mu/Yxp) + alfa)* Xb * Wn ) - (Kp * Ac * W) 
+    
+    # Biomasa
+    dXbdt = ( mu * Xb )  - (Kd * Xb * fc1) 
+
+    
+    return [dGlycdt, dNh4dt,  dPo4dt, dXbdt,  dAcdt, dGludt, dAspdt, dSerdt, dTrpdt, dPhedt, dAladt, dHisdt,
+            dProdt, dThrdt, dLysdt,dCysdt, dArgdt, dLeudt, dTyrdt, dGlydt, dValdt]
+
+def resolver_modelo(t, mu_max_glyc, mu_max_glu, mu_max_asp, 
+             mu_max_ser, mu_max_trp, mu_max_phe, 
+             mu_max_ala, mu_max_his, mu_max_pro, 
+             mu_max_thr, mu_max_lys, mu_max_cys, 
+             mu_max_arg, mu_max_leu, mu_max_tyr,  
+             mu_max_gly, mu_max_val, 
+             Ks_glyc, Ks_glu, Ks_asp, 
+             Ks_ser, Ks_trp, Ks_phe, 
+             Ks_ala, Ks_his, Ks_pro, 
+             Ks_thr, Ks_lys, Ks_cys, 
+             Ks_arg, Ks_leu, Ks_tyr,
+             Ks_gly, Ks_val,
+             Kp, Kd, alfa,
+             Yxglyc, Yxp, 
+             Yxnh, Yxpo4):
+    
+    y0 = [Glyc0, Nn40,  Po40, Xb0, Ac0, Glu0, Asp0, Ser0, Trp0, Phe0, Ala0, His0, Pro0, Thr0, Lys0, Cys0, Arg0, Leu0, Tyr0, Gly0, Val0]
+    
+    sol = odeint(kinetics, y0, t, args=(mu_max_glyc, mu_max_glu, mu_max_asp, 
+             mu_max_ser, mu_max_trp, mu_max_phe, 
+             mu_max_ala, mu_max_his, mu_max_pro, 
+             mu_max_thr, mu_max_lys, mu_max_cys, 
+             mu_max_arg, mu_max_leu, mu_max_tyr,  
+             mu_max_gly, mu_max_val, 
+             Ks_glyc, Ks_glu, Ks_asp, 
+             Ks_ser, Ks_trp, Ks_phe, 
+             Ks_ala, Ks_his, Ks_pro, 
+             Ks_thr, Ks_lys, Ks_cys, 
+             Ks_arg, Ks_leu, Ks_tyr,
+             Ks_gly, Ks_val,
+             Kp, Kd, alfa,
+             Yxglyc, Yxp, 
+             Yxnh, Yxpo4), tfirst=True, rtol=1e-6, atol=1e-6)
+     
+    sol = np.clip(sol, a_min=0, a_max=None)
+     
+    Glyc , Nh4, Po4, Xb, Ac, Glu, Asp, Ser, Trp, Phe, Ala, His, Pro, Thr, Lys, Cys, Arg, Leu, Tyr, Gly, Val = sol.T
+    
+    return [Glyc , Nh4, Po4, Xb, Ac, Glu, Asp, Ser, Trp, Phe, Ala, His, Pro, Thr, Lys, Cys, Arg, Leu, Tyr, Gly, Val]
+
+
+
+
+def modelo_fit(t,
+             mu_max_glyc, mu_max_glu, mu_max_asp, 
+             mu_max_ser, mu_max_trp, mu_max_phe, 
+             mu_max_ala, mu_max_his, mu_max_pro, 
+             mu_max_thr, mu_max_lys, mu_max_cys, 
+             mu_max_arg, mu_max_leu, mu_max_tyr,  
+             mu_max_gly, mu_max_val, 
+             Ks_glyc, Ks_glu, Ks_asp, 
+             Ks_ser, Ks_trp, Ks_phe, 
+             Ks_ala, Ks_his, Ks_pro, 
+             Ks_thr, Ks_lys, Ks_cys, 
+             Ks_arg, Ks_leu, Ks_tyr,
+             Ks_gly, Ks_val,
+             Kp, Kd, alfa,
+             Yxglyc, Yxp, 
+             Yxnh, Yxpo4):
+    
+    t = np.linspace(0, 120, 7)
+    #t = [0, 21, 42, 65, 71, 94, 115]
+    Glyc , Nh4, Po4, Xb, Ac, Glu, Asp, Ser, Trp, Phe, Ala, His, Pro, Thr, Lys, Cys, Arg, Leu, Tyr, Gly, Val = resolver_modelo(t, mu_max_glyc, mu_max_glu, mu_max_asp, 
+             mu_max_ser, mu_max_trp, mu_max_phe, 
+             mu_max_ala, mu_max_his, mu_max_pro, 
+             mu_max_thr, mu_max_lys, mu_max_cys, 
+             mu_max_arg, mu_max_leu, mu_max_tyr,  
+             mu_max_gly, mu_max_val, 
+             Ks_glyc, Ks_glu, Ks_asp, 
+             Ks_ser, Ks_trp, Ks_phe, 
+             Ks_ala, Ks_his, Ks_pro, 
+             Ks_thr, Ks_lys, Ks_cys, 
+             Ks_arg, Ks_leu, Ks_tyr,
+             Ks_gly, Ks_val,
+             Kp, Kd, alfa,
+             Yxglyc, Yxp, 
+             Yxnh, Yxpo4)
+    
+    return np.concatenate([Glyc , Nh4, Po4, Xb, Ac, Glu, Asp, Ser, Trp, Phe, Ala, His, Pro, Thr, Lys, Cys, Arg, Leu, Tyr, Gly, Val])
+   
+
+def get_bounds():
+    # Definir los límites inferior y superior de cada parámetro
+    lb = np.full(41, 1e-10).tolist()
+    ub = np.full(41, 1e2).tolist()
+    return lb, ub
+
+lb, ub = get_bounds()
+
+p0 =  [0.04038, 0.00379, 0.0058, 
+             0.001213, 0.000562, 0.000164, 
+             0.000136, 0.000562, 0.007941, 
+             0.002457, 0.000562, 0.07369, 
+             0.000106, 0.000693, 0.002652,  
+             0.000764, 0.001392,
+             0.630884, 0.08462, 0.00044, 
+             0.001156, 0.0199434, 0.00562,  
+             0.000562, 0.00562, 0.39806, 
+             0.144581, 0.000122, 0.249326, 
+             6.048e-6, 0.001222, 0.001756,
+             0.000562, 0.000562,
+             0.0388, 0.0187, 0.0025,
+             0.2103, 0.103, 
+             0.1008232, 0.01052203]
+
+lb, ub = get_bounds()
+
+popt, pcov = curve_fit(modelo_fit, t_exp, np.concatenate(( X_exp, S_exp, P_exp, NH4_exp, PO4_exp, Glu_exp, Asp_exp, Ser_exp, Trp_exp, Phe_exp, Ala_exp, His_exp, Pro_exp, Thr_exp, Lys_exp, Cys_exp, Arg_exp, Leu_exp, Tyr_exp, Gly_exp, Val_exp)), p0=p0, bounds=(lb, ub))
+
+(mu_max_glyc, mu_max_glu, mu_max_asp, 
+             mu_max_ser, mu_max_trp, mu_max_phe, 
+             mu_max_ala, mu_max_his, mu_max_pro, 
+             mu_max_thr, mu_max_lys, mu_max_cys, 
+             mu_max_arg, mu_max_leu, mu_max_tyr,  
+             mu_max_gly, mu_max_val,
+             Ks_glyc, Ks_glu, Ks_asp, 
+             Ks_ser, Ks_trp, Ks_phe, 
+             Ks_ala, Ks_his, Ks_pro, 
+             Ks_thr, Ks_lys, Ks_cys, 
+             Ks_arg, Ks_leu, Ks_tyr,
+             Ks_gly, Ks_val,
+             Kp, Kd, alfa,
+             Yxglyc, Yxp, 
+             Yxnh, Yxpo4) = popt    
+
+# Usa los parámetros óptimos de la primera ejecución como valores iniciales para la segunda ejecución
+p0 = popt
+
+# Realiza la segunda ejecución
+popt1, pcov = curve_fit(modelo_fit, t_exp, np.concatenate(( X_exp, S_exp, P_exp, NH4_exp, PO4_exp, Glu_exp, Asp_exp, Ser_exp, Trp_exp, Phe_exp, Ala_exp, His_exp, Pro_exp, Thr_exp, Lys_exp, Cys_exp, Arg_exp, Leu_exp, Tyr_exp, Gly_exp, Val_exp)), p0=p0, bounds=(lb, ub))
+
+# Usa los parámetros óptimos de la segunda ejecución como valores iniciales para la tercera ejecución
+p0 = popt1
+
+(mu_max_glyc1, mu_max_glu1, mu_max_asp1, 
+             mu_max_ser1, mu_max_trp1, mu_max_phe1, 
+             mu_max_ala1, mu_max_his1, mu_max_pro1, 
+             mu_max_thr1, mu_max_lys1, mu_max_cys1, 
+             mu_max_arg1, mu_max_leu1, mu_max_tyr1,  
+             mu_max_gly1, mu_max_val1,
+             Ks_glyc1, Ks_glu1, Ks_asp1, 
+             Ks_ser1, Ks_trp1, Ks_phe1, 
+             Ks_ala1, Ks_his1, Ks_pro1, 
+             Ks_thr1, Ks_lys1, Ks_cys1, 
+             Ks_arg1, Ks_leu1, Ks_tyr1,
+             Ks_gly1, Ks_val1, 
+             Kp1, Kd1, alfa1,
+             Yxglyc1, Yxp1, 
+             Yxnh1, Yxpo41) = popt1 
+
+# Realiza la tercera ejecución
+popt2, pcov = curve_fit(modelo_fit, t_exp, np.concatenate(( X_exp, S_exp, P_exp, NH4_exp, PO4_exp, Glu_exp, Asp_exp, Ser_exp, Trp_exp, Phe_exp, Ala_exp, His_exp, Pro_exp, Thr_exp, Lys_exp, Cys_exp, Arg_exp, Leu_exp, Tyr_exp, Gly_exp, Val_exp)), p0=p0, bounds=(lb, ub))
+
+(mu_max_glyc2, mu_max_glu2, mu_max_asp2, 
+             mu_max_ser2, mu_max_trp2, mu_max_phe2, 
+             mu_max_ala2, mu_max_his2, mu_max_pro2, 
+             mu_max_thr2, mu_max_lys2, mu_max_cys2, 
+             mu_max_arg2, mu_max_leu2, mu_max_tyr2,  
+             mu_max_gly2, mu_max_val2,
+             Ks_glyc2, Ks_glu2, Ks_asp2, 
+             Ks_ser2, Ks_trp2, Ks_phe2, 
+             Ks_ala2, Ks_his2, Ks_pro2, 
+             Ks_thr2, Ks_lys2, Ks_cys2, 
+             Ks_arg2, Ks_leu2, Ks_tyr2,
+             Ks_gly2, Ks_val2,
+             Kp2, Kd2, alfa2,
+             Yxglyc2, Yxp2, 
+             Yxnh2, Yxpo42) = popt2   
+
+S_sim, NH4_sim, PO4_sim, X_sim, P_sim, Glu_sim, Asp_sim, Ser_sim, Trp_sim, Phe_sim, Ala_sim, His_sim, Pro_sim, Thr_sim, Lys_sim, Cys_sim, Arg_sim, Leu_sim, Tyr_sim, Gly_sim, Val_sim = resolver_modelo(t_exp, mu_max_glyc2, mu_max_glu2, mu_max_asp2, 
+             mu_max_ser2, mu_max_trp2, mu_max_phe2, 
+             mu_max_ala2, mu_max_his2, mu_max_pro2, 
+             mu_max_thr2, mu_max_lys2, mu_max_cys2, 
+             mu_max_arg2, mu_max_leu2, mu_max_tyr2,  
+             mu_max_gly2, mu_max_val2,
+             Ks_glyc2, Ks_glu2, Ks_asp2, 
+             Ks_ser2, Ks_trp2, Ks_phe2, 
+             Ks_ala2, Ks_his2, Ks_pro2, 
+             Ks_thr2, Ks_lys2, Ks_cys2, 
+             Ks_arg2, Ks_leu2, Ks_tyr2,
+             Ks_gly2, Ks_val2,
+             Kp2, Kd2, alfa2,
+             Yxglyc2, Yxp2, 
+             Yxnh2, Yxpo42)
+
+
+
+t = np.linspace(0, 120, 1000)
+
+y_est = resolver_modelo(t, *popt1)
+
+# Obtener los valores simulados para cada variable
+print('-------------------------------------')
+print('           Resultados                ')
+print('-------------------------------------')
+print('           Parametros                ')
+print('-------------------------------------')
+# Define una lista con los nombres de los parámetros
+
+parametros = ['mu_max_glyc', 'mu_max_glu', 'mu_max_asp', 
+             'mu_max_ser', 'mu_max_trp', 'mu_max_phe', 
+             'mu_max_ala', 'mu_max_his', 'mu_max_pro', 
+             'mu_max_thr', 'mu_max_lys', 'mu_max_cys', 
+             'mu_max_arg', 'mu_max_leu', 'mu_max_tyr',  
+             'mu_max_gly', 'mu_max_val',
+             'Ks_glyc', 'Ks_glu', 'Ks_asp', 
+             'Ks_ser', 'Ks_trp', 'Ks_phe', 
+             'Ks_ala', 'Ks_his', 'Ks_pro', 
+             'Ks_thr', 'Ks_lys', 'Ks_cys', 
+             'Ks_arg', 'Ks_leu', 'Ks_tyr',
+             'Ks_gly', 'Ks_val',
+             'Kp', 'Kd', 'alfa',
+             'Yxglyc', 'Yxp', 
+             'Yxnh', 'Yxpo4']
+
+# Define una lista con los valores de los parámetros
+valores = [mu_max_glyc2, mu_max_glu2, mu_max_asp2, 
+             mu_max_ser2, mu_max_trp2, mu_max_phe2, 
+             mu_max_ala2, mu_max_his2, mu_max_pro2, 
+             mu_max_thr2, mu_max_lys2, mu_max_cys2, 
+             mu_max_arg2, mu_max_leu2, mu_max_tyr2,  
+             mu_max_gly2, mu_max_val2,
+             Ks_glyc2, Ks_glu2, Ks_asp2, 
+             Ks_ser2, Ks_trp2, Ks_phe2, 
+             Ks_ala2, Ks_his2, Ks_pro2, 
+             Ks_thr2, Ks_lys2, Ks_cys2, 
+             Ks_arg2, Ks_leu2, Ks_tyr2,
+             Ks_gly2, Ks_val2,
+             Kp2, Kd2, alfa2,
+             Yxglyc2, Yxp2, 
+             Yxnh2, Yxpo42]
+
+# Define una función para imprimir una fila de la tabla
+def imprimir_fila(numero, nombre, valor):
+    print("{:<5}{:<15}{:.4f}".format(numero, nombre, valor))
+
+# Imprime la tabla
+for i, parametro in enumerate(parametros):
+    imprimir_fila(i+1, parametro, valores[i])
+
+# Calcular el valor de R² para cada variable
+r2_S = r2_score(S_exp, S_sim[:len(S_exp)])
+r2_NH4 = r2_score(NH4_exp, NH4_sim[:len(NH4_exp)])
+r2_PO4 = r2_score(PO4_exp, PO4_sim[:len(PO4_exp)])
+r2_X = r2_score(X_exp, X_sim[:len(X_exp)])
+r2_P = r2_score(P_exp, P_sim[:len(P_exp)])
+r2_Glu = r2_score(Glu_exp, Glu_sim[:len(Glu_exp)])
+r2_Asp = r2_score(Asp_exp, Asp_sim[:len(Asp_exp)])
+r2_Ser = r2_score(Ser_exp, Ser_sim[:len(Ser_exp)])
+r2_Trp = r2_score(Trp_exp, Trp_sim[:len(Trp_exp)])
+r2_Phe = r2_score(Phe_exp, Phe_sim[:len(Phe_exp)])
+r2_Ala = r2_score(Ala_exp, Ala_sim[:len(Ala_exp)])
+r2_His = r2_score(His_exp, His_sim[:len(His_exp)])
+r2_Pro = r2_score(Pro_exp, Pro_sim[:len(Pro_exp)])
+r2_Thr = r2_score(Thr_exp, Thr_sim[:len(Thr_exp)])
+r2_Lys = r2_score(Lys_exp, Lys_sim[:len(Lys_exp)])
+r2_Cys = r2_score(Cys_exp, Cys_sim[:len(Cys_exp)])
+r2_Arg = r2_score(Arg_exp, Arg_sim[:len(Arg_exp)])
+r2_Leu = r2_score(Leu_exp, Leu_sim[:len(Leu_exp)])
+r2_Tyr = r2_score(Tyr_exp, Tyr_sim[:len(Tyr_exp)])
+r2_Gly = r2_score(Gly_exp, Gly_sim[:len(Gly_exp)])
+r2_Val = r2_score(Val_exp, Val_sim[:len(Val_exp)])
+
+# Imprime la tabla
+    
+variables = ['Glyc', 'Glu', 'Asp', 'Ser', 'Trp', 'Phe', 'Ala', 'His', 'Pro', 'Thr', 'Lys', 'Cys', 'Arg', 'Leu', 'Tyr', 'Gly', 'Val', 'P', 'X', 'Nh4', 'Po4']
+R_valores = [ r2_S, r2_Glu, r2_Asp, r2_Ser, r2_Trp, r2_Phe, r2_Ala, r2_His, r2_Pro, r2_Thr, r2_Lys, r2_Cys, r2_Arg, r2_Leu, r2_Tyr, r2_Gly, r2_Val, r2_P, r2_X, r2_NH4, r2_PO4]
+   
+print('-------------------------------------')
+print('             Tabla R2                ')
+print('-------------------------------------')
+def imprimir_filaR2(numero, nombre, R_valores):
+    print("{:<5}{:<15}{:.10f}".format(numero, nombre, R_valores))
+
+# Imprime la tabla
+for i, variables in enumerate(variables):
+    imprimir_filaR2(i+1, variables, R_valores[i])
+
+print('-------------------------------------')
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
+
+# Gráfica 1 - Biomasa
+fit = np.polyfit(X_exp, X_sim, 1)
+fit_fn = np.poly1d(fit)
+r_squared = r2_score(X_exp, X_sim)
+errors = X_exp - X_sim
+ax1.plot(X_sim, X_exp, 'o', markersize=8, color='black', label="Biomasa")
+ax1.plot(fit_fn(X_exp), X_exp, linestyle=':', linewidth=2, color='gray', label="Línea de regresión")
+ax1.set_ylabel("Biomasa experimental (g/L)")
+ax1.set_xlabel("Biomasa simulada (g/L)")
+ax1.tick_params(labelsize=10, colors='black')
+ax1.legend(loc='best', fontsize='small')
+ax1.set_title("Biomasa", fontsize=14, fontweight="bold")
+ax1.text(0.95, 0.05, f"R²={r_squared:.2f}", ha='right', transform=ax1.transAxes)
+
+# Gráfica 2 - Sustrato
+fit = np.polyfit(S_exp, S_sim, 1)
+fit_fn = np.poly1d(fit)
+r_squared = r2_score(S_exp, S_sim)
+errors = S_exp - S_sim
+ax2.plot(S_sim, S_exp, 'o', markersize=8, color='black', label="Sustrato")
+ax2.plot(fit_fn(S_exp), S_exp, linestyle=':', linewidth=2, color='gray', label="Línea de regresión")
+ax2.set_ylabel("Sustrato experimental (g/L)")
+ax2.set_xlabel("Sustrato simulada (g/L)")
+ax2.tick_params(labelsize=10, colors='black')
+ax2.legend(loc='best', fontsize='small')
+ax2.set_title("Sustrato", fontsize=14, fontweight="bold")
+ax2.text(0.95, 0.05, f"R²={r_squared:.2f}", ha='right', transform=ax2.transAxes)
+
+# Gráfica 3 - Producto
+fit = np.polyfit(P_exp, P_sim, 1)
+fit_fn = np.poly1d(fit)
+r_squared = r2_score(P_exp, P_sim)
+errors = P_exp - P_sim
+ax3.plot(P_exp, P_sim, 'o', markersize=8, color='black', label="Producto")
+ax3.plot(P_exp, fit_fn(P_exp), linestyle=':', linewidth=2, color='gray', label="Línea de regresión")
+ax3.set_xlabel("Producto experimental (g/L)")
+ax3.set_ylabel("Producto simulada  (g/L)")
+ax3.tick_params(labelsize=10, colors='black')
+ax3.legend(loc='best', fontsize='small')
+ax3.set_title("Producto", fontsize=14, fontweight="bold")
+ax3.text(0.95, 0.05, f"R²={r_squared:.2f}", ha='right', transform=ax3.transAxes)
+
+# Título de la figura
+fig.suptitle("Título de la figura", fontsize=16, fontweight="bold")
+
+plt.show()
+
+fig, ax = plt.subplots(figsize=(8, 6))
+
+# Calcular la línea de regresión
+fit = np.polyfit(X_exp, X_sim, 1)
+fit_fn = np.poly1d(fit)
+
+# Trazar la curva de biomasa experimental en el eje x y la curva de biomasa simulada en el eje y
+ax.plot(X_exp, X_sim, 'o', markersize=8, color='black', label="Biomasa")
+
+# Trazar la línea de regresión
+ax.plot(X_exp, fit_fn(X_exp), linestyle=':', linewidth=2, color='gray', label="Línea de regresión")
+
+# Mostrar la diferencia entre los valores de biomasa en puntos
+for x, y1, y2 in zip(X_exp, X_exp, X_sim):
+    ax.plot([x, x], [y1, y2], '-', color='red', linewidth=1)
+
+# Personalizar el eje
+ax.set_xlabel("Biomasa experimental (g/L)")
+ax.set_ylabel("Biomasa simulada  (g/L)")
+ax.tick_params(labelsize=10, colors='black')
+ax.legend(loc='best', fontsize='small')
+
+
+plt.title("Título de la figura", fontsize=16, fontweight="bold")
+
+fig, ax = plt.subplots(figsize=(8, 6))
+
+# Calcular la línea de regresión
+fit = np.polyfit(S_exp, S_sim, 1)
+fit_fn = np.poly1d(fit)
+
+# Trazar la curva de biomasa experimental en el eje x y la curva de biomasa simulada en el eje y
+ax.plot(S_exp, S_sim, 'o', markersize=8, color='black', label="Sustrato")
+
+# Trazar la línea de regresión
+ax.plot(S_exp, fit_fn(S_exp), linestyle=':', linewidth=2, color='gray', label="Línea de regresión")
+
+# Mostrar la diferencia entre los valores de biomasa en puntos
+for x, y1, y2 in zip(S_exp, S_exp, S_sim):
+    ax.plot([x, x], [y1, y2], '-', color='red', linewidth=1)
+
+# Personalizar el eje
+ax.set_xlabel("Sustrato experimental (g/L)")
+ax.set_ylabel("Sustrato simulada  (g/L)")
+ax.tick_params(labelsize=10, colors='black')
+ax.legend(loc='best', fontsize='small')
+
+plt.title("Título de la figura", fontsize=16, fontweight="bold")
+
+# Producto
+fig, ax = plt.subplots(figsize=(8, 6))
+
+# Calcular la línea de regresión
+fit = np.polyfit(P_exp, P_sim, 1)
+fit_fn = np.poly1d(fit)
+
+# Trazar la curva de biomasa experimental en el eje x y la curva de biomasa simulada en el eje y
+ax.plot(P_exp, P_sim, 'o', markersize=8, color='black', label="Producto")
+
+# Trazar la línea de regresión
+ax.plot(P_exp, fit_fn(P_exp), linestyle=':', linewidth=2, color='gray', label="Línea de regresión")
+
+# Mostrar la diferencia entre los valores de biomasa en puntos
+for x, y1, y2 in zip(P_exp, P_exp, P_sim):
+    ax.plot([x, x], [y1, y2], '-', color='red', linewidth=1)
+
+# Personalizar el eje
+ax.set_xlabel("Producto experimental (g/L)")
+ax.set_ylabel("Producto simulada  (g/L)")
+ax.tick_params(labelsize=10, colors='black')
+ax.legend(loc='best', fontsize='small')
+
+plt.title("Título de la figura", fontsize=16, fontweight="bold")
+
+
+# Graficar los resultados
+fig, axs = plt.subplots(3, 2, figsize=(14, 10))
+
+axs[0, 0].plot(t_exp, S_exp, 'o', markersize=8, color='black', label="S_exp")
+axs[0, 0].plot(t_exp, S_sim, linewidth=2, color='gray', label="Modelo")
+axs[0, 0].set_xlabel("Tiempo (h)")
+axs[0, 0].set_ylabel("[S] (g/L)")
+axs[0, 0].tick_params(labelsize=10, colors='black')
+axs[0, 0].legend()
+
+axs[0, 1].plot(t_exp, X_exp, 'o', color='black', label="X_exp")
+axs[0, 1].plot(t, y_est[3], linewidth=2, color='gray', label="X_pred")
+axs[0, 1].set_xlabel("Tiempo (h)")
+axs[0, 1].set_ylabel("[X] (g/L)")
+axs[0, 1].legend()
+
+axs[1, 0].plot(t_exp, P_exp, 'o', color='black', label="P_exp")
+axs[1, 0].plot(t, y_est[4], linewidth=2, color='gray', label="P_pred")
+axs[1, 0].set_xlabel("Tiempo (h)")
+axs[1, 0].set_ylabel("[P] (g/L)")
+axs[1, 0].legend()
+
+axs[1, 1].plot(t_exp, NH4_exp, 'o', color='black', label="NH4_exp")
+axs[1, 1].plot(t_exp, NH4_sim, linewidth=2, color='gray', label="NH4_pred")
+axs[1, 1].set_xlabel("Tiempo (h)")
+axs[1, 1].set_ylabel("[NH4] (g/L)")
+axs[1, 1].legend()
+
+axs[2, 0].plot(t_exp, PO4_exp, 'o', color='black', label="PO4_exp")
+axs[2, 0].plot(t_exp, PO4_sim, linewidth=2, color='gray', label="PO4_pred")
+axs[2, 0].set_xlabel("Tiempo (h)")
+axs[2, 0].set_ylabel("[PO4] (g/L)")
+axs[2, 0].legend()
+
+axs[2, 1].plot(t_exp, Glu_exp, 'o', color='black', label="Glu_exp")
+axs[2, 1].plot(t, y_est[5], linewidth=2, color='gray', label="Glu_pred")
+axs[2, 1].set_xlabel("Tiempo (h)")
+axs[2, 1].set_ylabel("[Glu] (g/L)")
+axs[2, 1].legend()
+
+fig.subplots_adjust(hspace=0.6)
+plt.show()
+
+#Aminoacidos t=0 y Glyc
+
+fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(15, 15))
+
+# agregar etiqueta global para el eje x
+fig.text(0.5, 0.04, 'Tiempo (horas)', ha='center', va='center', fontsize=20)
+
+# agregar etiqueta global para el eje y
+fig.text(0.06, 0.5, 'Concentración (g/L)', ha='center', va='center', rotation='vertical', fontsize=20)
+
+#fig.suptitle('Concentración de aminoácidos en el tiempo t>20', fontsize=20)
+
+axs[0, 0].plot(t, y_est[6], color='gray', label='Asp')
+axs[0, 0].plot(t_exp, Asp_exp,  'o', color='black',label='Asp experimental')
+axs[0, 0].legend()
+
+axs[0, 1].plot(t, y_est[7], color='gray', label='Ser')
+axs[0, 1].plot(t_exp, Ser_exp, 'o', color='black', label='Ser experimental')
+axs[0, 1].legend()
+
+axs[1, 0].plot(t, y_est[8], color='gray', label='Trp')
+axs[1, 0].plot(t_exp, Trp_exp, 'o', color='black', label='Trp experimental')
+axs[1, 0].legend()
+
+axs[1, 1].plot(t, y_est[10], color='gray', label='Ala')
+axs[1, 1].plot(t_exp, Ala_exp, 'o', color='black', label='Ala experimental')
+axs[1, 1].legend()
+
+axs[2, 0].plot(t, y_est[9], color='gray', label='Phe')
+axs[2, 0].plot(t_exp, Phe_exp, 'o', color='black', label='Phe experimental')
+axs[2, 0].legend()
+
+axs[2, 1].plot(t, y_est[20], color='gray', label='Val')
+axs[2, 1].plot(t2_exp, Val_exp, 'o', color='black', label='Val experimental')
+axs[2, 1].legend()
+
+plt.show()
+
+t2= (20,120,1000)
+#Aminoacidos t>20
+
+fig, axs = plt.subplots(nrows=4, ncols=2, figsize=(15, 15))
+
+# agregar etiqueta global para el eje x
+fig.text(0.5, 0.04, 'Tiempo (horas)', ha='center', va='center', fontsize=20)
+
+# agregar etiqueta global para el eje y
+fig.text(0.06, 0.5, 'Concentración (g/L)', ha='center', va='center', rotation='vertical', fontsize=20)
+
+#fig.suptitle('Concentración de aminoácidos en el tiempo t>20', fontsize=20)
+
+axs[0, 0].plot(t, y_est[19], color='gray', label='Gly')
+axs[0, 0].plot(t2_exp, Gly_exp, 'o', color='black', label='Gly experimental')
+axs[0, 0].legend()
+
+axs[0, 1].plot(t, y_est[18], color='gray', label='Tyr')
+axs[0, 1].plot(t2_exp, Tyr_exp, 'o', color='black', label='Tyr experimental')
+axs[0, 1].legend()
+
+axs[1, 0].plot(t, y_est[17], color='gray', label='Leu')
+axs[1, 0].plot(t2_exp, Leu_exp, 'o', color='black', label='Leu experimental')
+axs[1, 0].legend()
+
+axs[1, 1].plot(t, y_est[16], color='gray', label='Arg')
+axs[1, 1].plot(t2_exp, Arg_exp, 'o', color='black', label='Arg experimental')
+axs[1, 1].legend()
+
+axs[2, 0].plot(t, y_est[15], color='gray', label='Cys')
+axs[2, 0].plot(t2_exp, Cys_exp, 'o', color='black', label='Cys experimental')
+axs[2, 0].legend()
+
+axs[2, 1].plot(t, y_est[14], color='gray', label='Lys')
+axs[2, 1].plot(t2_exp, Lys_exp, 'o', color='black', label='Lys experimental')
+axs[2, 1].legend()
+
+axs[3, 0].plot(t, y_est[13], color='gray', label='Thr')
+axs[3, 0].plot(t2_exp, Thr_exp, 'o', color='black', label='Thr experimental')
+axs[3, 0].legend()
+
+axs[3, 1].plot(t, y_est[12], color='gray', label='Pro')
+axs[3, 1].plot(t2_exp, Pro_exp, 'o', color='black', label='Pro experimental')
+axs[3, 1].legend()
+
+plt.show()
